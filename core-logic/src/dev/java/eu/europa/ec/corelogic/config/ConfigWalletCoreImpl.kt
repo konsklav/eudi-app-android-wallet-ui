@@ -32,7 +32,7 @@ internal class WalletCoreConfigImpl(
 
     private companion object {
         // Change for old version: "https://dev.issuer.eudiw.dev"
-        const val VCI_ISSUER_URL = "http://localhost:5000"       // Change for local deployment --> "http://localhost:5000" or "http://localhost:8001"
+        const val VCI_ISSUER_URL = "http://similarly-up-raven.ngrok-free.app"       // Change for local deployment using my ngrok static domain  --> "http://similarly-up-raven.ngrok-free.app"
         const val VCI_CLIENT_ID = "wallet-dev"
         const val AUTHENTICATION_REQUIRED = false
     }
