@@ -15,5 +15,5 @@
   -->
 
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
+    <base-config cleartextTrafficPermitted="false" />      <!-- Change to true for local deployment! -->
 </network-security-config>
