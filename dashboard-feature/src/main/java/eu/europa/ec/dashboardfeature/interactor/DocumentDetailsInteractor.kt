@@ -16,15 +16,19 @@
 
 package eu.europa.ec.dashboardfeature.interactor
 
+import eu.europa.ec.businesslogic.controller.storage.PrefKeys
 import eu.europa.ec.businesslogic.extension.safeAsync
-import eu.europa.ec.commonfeature.ui.document_details.domain.DocumentDetailsDomain
-import eu.europa.ec.commonfeature.ui.document_details.transformer.DocumentDetailsTransformer
+import eu.europa.ec.businesslogic.provider.UuidProvider
 import eu.europa.ec.corelogic.controller.DeleteAllDocumentsPartialState
 import eu.europa.ec.corelogic.controller.DeleteDocumentPartialState
 import eu.europa.ec.corelogic.controller.WalletCoreDocumentsController
 import eu.europa.ec.corelogic.extension.localizedIssuerMetadata
 import eu.europa.ec.corelogic.model.DocumentIdentifier
 import eu.europa.ec.corelogic.model.toDocumentIdentifier
+import eu.europa.ec.dashboardfeature.ui.documents.detail.model.DocumentDetailsDomain
+import eu.europa.ec.dashboardfeature.ui.documents.detail.transformer.DocumentDetailsTransformer
+import eu.europa.ec.dashboardfeature.ui.documents.detail.transformer.DocumentDetailsTransformer.createDocumentCredentialsInfoUi
+import eu.europa.ec.dashboardfeature.ui.documents.model.DocumentCredentialsInfoUi
 import eu.europa.ec.eudi.wallet.document.DocumentId
 import eu.europa.ec.eudi.wallet.document.IssuedDocument
 import eu.europa.ec.eudi.wallet.document.format.MsoMdocFormat
@@ -41,7 +45,8 @@ sealed class DocumentDetailsInteractorPartialState {
         val issuerLogo: URI?,
         val documentDetailsDomain: DocumentDetailsDomain,
         val documentIsBookmarked: Boolean,
-        val isRevoked: Boolean
+        val isRevoked: Boolean,
+        val documentCredentialsInfoUi: DocumentCredentialsInfoUi?,
     ) : DocumentDetailsInteractorPartialState()
 
     data class Failure(val error: String) : DocumentDetailsInteractorPartialState()
@@ -88,7 +93,9 @@ interface DocumentDetailsInteractor {
 
 class DocumentDetailsInteractorImpl(
     private val walletCoreDocumentsController: WalletCoreDocumentsController,
-    private val resourceProvider: ResourceProvider
+    private val resourceProvider: ResourceProvider,
+    private val uuidProvider: UuidProvider,
+    private val prefKeys: PrefKeys,
 ) : DocumentDetailsInteractor {
 
     private val genericErrorMsg
@@ -106,9 +113,19 @@ class DocumentDetailsInteractorImpl(
                 val documentDetailsDomainResult =
                     DocumentDetailsTransformer.transformToDocumentDetailsDomain(
                         document = safeIssuedDocument,
-                        resourceProvider = resourceProvider
+                        resourceProvider = resourceProvider,
+                        uuidProvider = uuidProvider
                     )
                 val documentDetailsDomain = documentDetailsDomainResult.getOrThrow()
+
+                val documentCredentialsInfo = if (prefKeys.getShowBatchIssuanceCounter()) {
+                    createDocumentCredentialsInfoUi(
+                        document = safeIssuedDocument,
+                        resourceProvider = resourceProvider
+                    )
+                } else {
+                    null
+                }
 
                 val userLocale = resourceProvider.getLocale()
                 val issuerName = safeIssuedDocument.localizedIssuerMetadata(userLocale)?.name
@@ -125,7 +142,8 @@ class DocumentDetailsInteractorImpl(
                         documentDetailsDomain = documentDetailsDomain,
                         documentIsBookmarked = documentIsBookmarked,
                         issuerLogo = issuerLogo?.uri,
-                        isRevoked = documentIsRevoked
+                        isRevoked = documentIsRevoked,
+                        documentCredentialsInfoUi = documentCredentialsInfo,
                     )
                 )
             } ?: emit(DocumentDetailsInteractorPartialState.Failure(error = genericErrorMsg))
@@ -164,7 +182,7 @@ class DocumentDetailsInteractorImpl(
                 }
 
             if (shouldDeleteAllDocuments) {
-                walletCoreDocumentsController.deleteAllDocuments(mainPidDocumentId = documentId)
+                walletCoreDocumentsController.deleteAllDocuments()
                     .map {
                         when (it) {
                             is DeleteAllDocumentsPartialState.Failure -> DocumentDetailsInteractorDeleteDocumentPartialState.Failure(
